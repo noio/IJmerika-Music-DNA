@@ -3,7 +3,7 @@ import os
 import webapp2
 from google.appengine.ext.webapp import template
 from google.appengine.ext import db
-import simplejson as json
+import json
 import logging 
 import datetime
 
