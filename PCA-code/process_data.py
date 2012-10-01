@@ -16,8 +16,8 @@ from pca import PCA
 import scipy.io as sio
 import gzip
 
-DB_FILE = 'db3.pkl'
-PREFIX = 'data/v2_'
+DB_FILE = 'db2.pkl'
+PREFIX = 'data/v22_'
 
 result = 'result.pkl'
 
@@ -44,6 +44,8 @@ for base_artist, similarity in similarities.items():
     for s in similarity:
         similarity_matrix[base_artists.index(base_artist), all_artists.index(s.item.name)] = s.match
 
+
+similarity_matrix = similarity_matrix / np.sqrt(np.sum(similarity_matrix**2,0))
 mean_features = np.mean(similarity_matrix, axis=0)
 pc = PCA(similarity_matrix - mean_features)
 

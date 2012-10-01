@@ -15,16 +15,22 @@ import matplotlib.pyplot as plt
 import numpy as np
 from operator import itemgetter
 from pprint import pprint
+from scipy import stats
+import pickle as pkl
 
-x = SimilarityGetter('data/v1_')
+PREFIX = 'data/v2_'
+
+x = SimilarityGetter(PREFIX)
 
 print 'BLA'
 all_values = x.get_values(x.base_artists)
 
+pkl.dump(dict(mean=np.mean(all_values), std=np.mean(all_values)), open(PREFIX+'distr.pkl', 'w'))
+
 pprint(sorted(zip(x.base_artists, all_values), key=itemgetter(1)))
 
-pprint(sorted(zip(x.all_artists, x.pca_0), key=itemgetter(1)))[:10]
-pprint(sorted(zip(x.all_artists, x.pca_0), key=itemgetter(1)))[-10:]
+# pprint(sorted(zip(x.all_artists, x.pca_0), key=itemgetter(1)))[:10]
+# pprint(sorted(zip(x.all_artists, x.pca_0), key=itemgetter(1)))[-10:]
 
 print np.mean(all_values)
 # plt.hist(all_values, bins=100)

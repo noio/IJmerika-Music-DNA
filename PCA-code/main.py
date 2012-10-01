@@ -16,6 +16,7 @@ import pickle as pkl
 from operator import itemgetter
 from pprint import pprint
 import scipy.io as sio
+from scipy import stats
 
 from pca import PCA
 
@@ -27,7 +28,7 @@ import matplotlib.pyplot as plt
 API_KEY = "dfa3f081178624892ff5259be9bdc7c2" # this is a sample key
 API_SECRET = "6d34c6ab655c33e4e46f1b59a946d6f3"
 
-PREFIX = 'data/v2_'
+PREFIX = 'data/v22_'
 
 network = pylast.LastFMNetwork(api_key = API_KEY, api_secret = 
     API_SECRET)
@@ -44,6 +45,14 @@ class SimilarityGetter(object):
         self.similarity_matrix = pkl.load(open(prefix+'similarity_matrix.pkl'))
         self.network = None
         self.mean_features = pkl.load(open(prefix+'mean_features.pkl'))
+        
+        
+        if os.path.exists(self.prefix+'distr.pkl'):
+            print 'Distributie gevonden'
+            self.distr = stats.distributions.norm(**pkl.load(open(self.prefix+'distr.pkl')))
+        else:
+            print 'Geen Distributie gevonden'
+            self.distr = None
         
 
         
@@ -86,16 +95,26 @@ class SimilarityGetter(object):
                     vector[self.all_artists.index(other_artist)] = match
             
             
-            
-        result = np.dot(vector - self.mean_features, self.pca_0)
+        if np.sum(vector) > 0:
+            result = np.dot(vector/np.dot(vector, vector) - self.mean_features, self.pca_0)
+        else:
+            result = np.nan
+        
+        if self.distr is not None:
+            result = self.distr.cdf(result)
+        
         self.cache[artist_string] = result
         
         pkl.dump(self.cache, open(self.prefix+'cache.pkl', 'w'))
         return result
             
             
-    def get_values(self, artist_list):
-        return [self.get_value(artist) for artist in artist_list]
+    def get_values(self, artist_list, filter_nan=True):
+        if filter_nan:
+            values = [self.get_value(artist) for artist in artist_list]
+            return [v for v in values if v != np.nan]
+        else:
+            return [self.get_value(artist) for artist in artist_list]
 
 
 if __name__ == '__main__':
@@ -126,9 +145,15 @@ if __name__ == '__main__':
 
 
 
+    # values = [x.get_values(gilles[:5]), x.get_values(tom[:5]), x.get_values(thomas[:5])]
     values = [x.get_values(gilles), x.get_values(tom), x.get_values(thomas)]
-    plt.legend(['Gilles', 'Tom', 'Thomas'])
+
     
 
-    plt.hist(values, bins=100)
+    # plt.hist(values, bins=100)
+    # plt.plot(np.tile([0, 1], (len(values), 1)), np.tile(values, (1,2)), linewidth=2.0)
+    plt.hlines(y=values[0], xmin=0, xmax=1, color='red', linewidth=2.0)
+    plt.hlines(y=values[1], xmin=0, xmax=1, color='blue', linewidth=2.0)
+    plt.hlines(y=values[2], xmin=0, xmax=1, color='green', linewidth=2.0)
+    plt.legend(['Gilles', 'Tom', 'Thomas'])
     plt.show()
