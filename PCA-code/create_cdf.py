@@ -18,14 +18,14 @@ from pprint import pprint
 from scipy import stats
 import pickle as pkl
 
-PREFIX = 'data/v2_'
+PREFIX = 'data/v22_'
 
 x = SimilarityGetter(PREFIX)
 
 print 'BLA'
 all_values = x.get_values(x.base_artists)
 
-pkl.dump(dict(mean=np.mean(all_values), std=np.mean(all_values)), open(PREFIX+'distr.pkl', 'w'))
+pkl.dump(dict(mean=np.mean(all_values), std=np.std(all_values)), open(PREFIX+'distr.pkl', 'w'))
 
 pprint(sorted(zip(x.base_artists, all_values), key=itemgetter(1)))
 
