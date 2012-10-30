@@ -1,3 +1,5 @@
 .DS_Store
 *.pyc
 appengine/index.yaml
+*.pickle.gz
+*.png
