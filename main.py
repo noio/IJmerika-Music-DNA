@@ -69,8 +69,9 @@ class LastFM(object):
             print "LastFM: %s %s" % (method, params)
             data = json.loads(urllib2.urlopen(url).read())
             self.cache[(method, frozenset(params.items()))] = data
-            # Store the cache every 10 items.
-            if len(self.cache) % 10 == 0:
+            # Store the cache every 20 items.
+            if len(self.cache) % 20 == 0:
+                print "LastFM: dumping cache..."
                 with gzip.open(self.CACHE_FILE, 'wb') as gz:
                     pickle.dump(self.cache, gz, protocol=-1)
         return self.cache[(method, frozenset(params.items()))]
@@ -185,10 +186,10 @@ class Visualizer(object):
         w = self.res[0]
         bar = np.ones((30, w))
         x = remap(projection, self.bar_data_range[0], (0, w))
-        x = np.clip(x, 1, w-2).astype('int')
+        x = np.clip(x, 2, w-2).astype('int')
         for _x in x:
-            bar[:, _x-1:_x+1] *= 0.5
-            bar[1:-1, _x+1] *= 0.5
+            bar[:, _x-2:_x+1] *= 0.8
+            bar[1:-1, _x+1] *= 0.8
         
         return zoom(bar, 2, order=0)
         
@@ -213,7 +214,7 @@ if __name__ == '__main__':
     except IOError:
         print "Building new Artist Matrix."
         feature_artists = [artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag)]
-        sample_artists = lastfm.chart_gettopartists(50)
+        sample_artists = lastfm.chart_gettopartists(100)
         am.do_pca(feature_artists, sample_artists)
         am.dump('_artistmatrix.pickle.gz')
     
@@ -223,7 +224,7 @@ if __name__ == '__main__':
         
     # TEST
     for user in ['andr01d', 'jeboyG', 'tomaiz']:
-        artists = lastfm.user_gettopartists(user, limit=10)
+        artists = lastfm.user_gettopartists(user, limit=20)
         viz.draw(am.project(artists), 'bar_' + user + '.png')
 
     # TODO: Below
