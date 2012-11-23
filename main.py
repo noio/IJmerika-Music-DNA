@@ -58,7 +58,7 @@ class LastFM(object):
             print "LastFM: Error reading cache. %s" % e
             self.cache = {}
     
-    def get(self, method, params):
+    def get(self, method, params, extractor=None):
         """ Makes the API call, retrieves from cache if needed, 
             and parses JSON
         """
@@ -68,29 +68,36 @@ class LastFM(object):
             url = '%s?method=%s&%s&api_key=%s&format=json' % (LastFM.API_URL, method, querystring, self.api_key)
             print "LastFM: %s %s" % (method, params)
             data = json.loads(urllib2.urlopen(url).read())
+            # Extract only the desired data, saves cache size/time
+            if callable(extractor):
+                data = extractor(data)
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
             if len(self.cache) % 20 == 0:
-                print "LastFM: dumping cache..."
-                with gzip.open(self.CACHE_FILE, 'wb') as gz:
-                    pickle.dump(self.cache, gz, protocol=-1)
+                self.dump_cache()
         return self.cache[(method, frozenset(params.items()))]
         
-    def artist_getsimilar(self, artist):
-        data = self.get('artist.getsimilar', {'artist': artist.encode('utf-8')})
-        return [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
+    def dump_cache(self):
+        """ Dumps the cache now. """
+        print "LastFM: dumping cache..."
+        with gzip.open(self.CACHE_FILE, 'wb') as gz:
+            pickle.dump(self.cache, gz, protocol=-1)
         
-    def tag_gettopartists(self, tag):
-        data = self.get('tag.gettopartists', {'tag': tag})
-        return [d['name'] for d in data['topartists']['artist']]
+    def artist_getsimilar(self, artist):
+        extractor = lambda data: [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
+        return self.get('artist.getsimilar', {'artist': artist.encode('utf-8')}, extractor)
+        
+    def tag_gettopartists(self, tag, limit=50):
+        extractor = lambda data: [d['name'] for d in data['topartists']['artist']]
+        return self.get('tag.gettopartists', {'tag': tag, 'limit':limit}, extractor)
         
     def chart_gettopartists(self, limit=200):
-        data = self.get('chart.gettopartists', {'limit': limit})
-        return [d['name'] for d in data['artists']['artist']]
+        extractor = lambda data: [d['name'] for d in data['artists']['artist']]
+        data = self.get('chart.gettopartists', {'limit': limit}, extractor)
         
     def user_gettopartists(self, user, limit=50):
-        data = self.get('user.gettopartists', {'user': user, 'limit': limit})
-        return [d['name'] for d in data['topartists']['artist']]
+        extractor = lambda data: [d['name'] for d in data['topartists']['artist']]
+        return self.get('user.gettopartists', {'user': user, 'limit': limit}, extractor)
         
 
 class ArtistMatrix(object):
@@ -127,7 +134,7 @@ class ArtistMatrix(object):
         similar_to = defaultdict(float, self.lastfm.artist_getsimilar(artist))
         return np.array([similar_to[f] for f in self.feature_artists])
         
-    def do_pca(self, feature_artists, sample_artists, max_comps=100):
+    def set_projection_pca(self, feature_artists, sample_artists, max_comps=100):
         """ Performs PCA on the feature_artists/sample_artist matrix
         """
         self.feature_artists = feature_artists
@@ -141,6 +148,29 @@ class ArtistMatrix(object):
         self.coefficients = v.T[:max_comps]
         print "ArtistMatrix: obtained %s coefficient matrix." % (self.coefficients.shape, )
         
+    def set_projection_lda(self, feature_artists, sample0, sample1, add=True):
+        """ Performs linear disciminant analysis:
+        """
+        self.feature_artists = feature_artists
+        # Build a data matrix, observations are rows
+        matrix0 = np.vstack([self.get_vector(artist) for artist in sample0])
+        matrix1 = np.vstack([self.get_vector(artist) for artist in sample1])
+        # Compute the class means
+        mu0 = matrix0.mean(axis=0)
+        mu1 = matrix1.mean(axis=0)
+        # ..and the shared covariance (LDA assumes that Sigma0 == Sigma1)
+        matrix0 -= mu0
+        matrix1 -= mu1
+        self.center = (mu0 + mu1) / 2
+        sigma = np.cov(np.vstack((matrix0, matrix1)).T)
+        # Compute the vector w along which we project
+        w = normalize(np.dot(np.linalg.pinv(sigma), (mu1 - mu0))[np.newaxis, :])
+        # Either create a new coefficient matrix, or add w to an existing one
+        if not add or self.coefficients is None:
+            self.coefficients = w
+        else:
+            self.coefficients = np.vstack((self.coefficients, w))
+        
     def project(self, artists):
         # Gather data
         data = np.vstack([self.get_vector(artist) for artist in artists])
@@ -152,7 +182,7 @@ class ArtistMatrix(object):
         """ Print some information about the projection this matrix
             performs
         """
-        for i in range(3):
+        for i in range(min(3, len(self.coefficients))):
             print "=== Dimension %d ===" % i
             assert len(self.coefficients[i,:]) == len(self.feature_artists)
             influence = sorted(zip(self.coefficients[i,:], self.feature_artists), reverse=True)
@@ -170,7 +200,7 @@ class Visualizer(object):
         self.res            = resolution
         self.bars           = bars
         # TODO: Set proper range for bars, this is just empirically found.
-        self.bar_data_range = [(-0.01, 0.01) for _ in xrange(bars)]
+        self.bar_data_range = [(-0.1, 0.1) for _ in xrange(bars)]
         self.bar_height     = bar_height
         
     def draw(self, projection, filename):
@@ -213,13 +243,30 @@ if __name__ == '__main__':
     # BUILD ONE OTHERWISE
     except IOError:
         print "Building new Artist Matrix."
-        feature_artists = [artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag)]
-        sample_artists = lastfm.chart_gettopartists(100)
-        am.do_pca(feature_artists, sample_artists)
+        feature_artists = set([artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag, 100)])
+
+        # PCA:
+        # sample_artists = lastfm.chart_gettopartists(100)
+        # am.set_projection_pca(feature_artists, sample_artists)
+        
+        # LDA:
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("indie", 20), 
+                              lastfm.tag_gettopartists("pop", 20))
+
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("electronic", 20), 
+                              lastfm.tag_gettopartists("metal", 20))
+                              
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("hip hop", 20), 
+                              lastfm.tag_gettopartists("indie", 20))
+    
+        
         am.dump('_artistmatrix.pickle.gz')
     
     am.print_info()
-        
+    
     viz = Visualizer()
         
     # TEST
