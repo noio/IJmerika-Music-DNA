@@ -69,14 +69,13 @@ class LastFM(object):
             url = '%s?method=%s&%s&api_key=%s&format=json' % (LastFM.API_URL, method, querystring, self.api_key)
             print "LastFM: %s %s" % (method, params)
             data = json.loads(urllib2.urlopen(url).read())
-            
-            if 'error' in data:
-                return []
-            
-            # Extract only the desired data, saves cache size/time
-            if callable(extractor):
-                data = extractor(data)
 
+            try:
+                # Extract only the desired data, saves cache size/time
+                if callable(extractor):
+                    data = extractor(data)
+            except (TypeError, KeyError):
+                return []
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
 
@@ -153,6 +152,7 @@ class ArtistMatrix(object):
         self.feature_artists = feature_artists
         # Build a data matrix, observations are rows
         matrix = np.vstack([self.get_vector(artist) for artist in sample_artists])
+        matrix = matrix[(matrix ** 2).sum(axis=1) > 0]
         # Subtract the mean
         self.center = matrix.mean(axis=0)
         matrix -= self.center
@@ -160,7 +160,6 @@ class ArtistMatrix(object):
         _, d, v = np.linalg.svd(np.cov(matrix.T))
         self.coefficients = v.T[:max_comps]
         print "ArtistMatrix: obtained %s coefficient matrix." % (self.coefficients.shape, )
-        
 
         
     def set_projection_lda(self, feature_artists, sample0, sample1, add=True):
@@ -189,14 +188,15 @@ class ArtistMatrix(object):
     def project(self, artists, normalize_projection=True, normalization_method='uniformize'):
         # Gather data
         data = np.vstack([self.get_vector(artist) for artist in artists])
+        valid = (data ** 2).sum(axis=1) > 0
         data -= self.center                          # Subtract center
         data = normalize(data)
         
-        return np.dot(self.coefficients, data.T).T
+        return np.dot(self.coefficients, data.T).T, valid
             
     def find_distribution(self, sample):
         """ Find the data distributions for the given sample """
-        data = self.project(sample)
+        data, _ = self.project(sample)
         self.distributions = [scipy.stats.norm.fit(dim) for dim in data.T]
         
             
@@ -219,18 +219,11 @@ class ArtistMatrix(object):
         for i in range(min(3, len(self.coefficients))):
             print "=== Dimension %d ===" % i
             assert len(self.coefficients[i,:]) == len(self.feature_artists)
-            influence = sorted(zip(self.project(self.feature_artists)[:, i], self.feature_artists), reverse=True)
+            projected, _ = self.project(self.feature_artists)[:, i]
+            influence = sorted(zip(project, self.feature_artists), reverse=True)
             print '    More like: ' + ', '.join(artist for (_, artist) in influence[:5])
             print '    Less like: ' + ', '.join(artist for (_, artist) in influence[-5:])
             
-    def estimate_projected_distribution(self):
-        
-        self.projected_sample_distributions = []
-        
-        data = self.project(self.sample_artists)
-        
-        for i in xrange(len(self.coefficients)):
-            self.projected_sample_distributions.insert(i, scipy.stats.norm.fit(data[:, i]))
 
  
 class Visualizer(object):
@@ -241,14 +234,18 @@ class Visualizer(object):
 
     def __init__(self, printer, resolution=512, 
                                 bars=3, 
-                                bar_height=20, 
-                                bar_range=None):
+                                bar_width=10,
+                                bar_height=30, 
+                                bar_range=None,
+                                dry_run=False):
         # Vars
         self.printer    = printer
         self.resolution = resolution
         self.bars       = bars
         self.bar_range  = bar_range
         self.bar_height = bar_height
+        self.bar_width  = bar_width
+        self.dry_run    = dry_run
         
         if self.bar_range == None:
             self.bar_range = [(0, 1) for _ in xrange(bars)]
@@ -260,19 +257,34 @@ class Visualizer(object):
             features are the columns
         """
         for i in xrange(min(3, projection.shape[1])):
-            bar = [self.drawbar(projection[:,i]) for i in xrange(3)]
+            bar = self.drawbar(projection[:,i])
             imsave('temp.png', bar)
-            self.printer.image('temp.png')
+            
+            self.printcall('image','temp.png')
+            self.printcall('control','LF')
+        
+        gibber = "MUSIC_DNA//USR:%s" % (username.upper())
+        
+        self.printcall('text',gibber)
+        self.printcall('set', align='right')
+        self.printcall('control','LF')
+        self.printcall('image','256-noise-clean.gif')
+        self.printcall('cut')
+        
+    def printcall(self, f, *args, **kwargs):
+        if self.printer is not None and not self.dry_run:
+            getattr(self.printer,f)(*args, **kwargs)
         
     def drawbar(self, projection):
         """ Return image of a single electrophoresis bar """
-        w = self.resolution
+        w = self.resolution / 2
+        bw = self.bar_width // 2
         bar = np.ones((self.bar_height, w))
         x = remap(projection, self.bar_range[0], (0, w))
-        x = np.clip(x, 2, w-2).astype('int')
+        x = np.clip(x, bw, w-bw).astype('int')
         for _x in x:
-            bar[:, _x-2:_x+1] *= 0.8
-            bar[1:-1, _x+1] *= 0.8
+            bar[:, _x-bw:_x+(bw-1)] *= 0.8
+            bar[1:-1, _x+(bw-1)] *= 0.8
         
         return zoom(bar, 2, order=0)
         
