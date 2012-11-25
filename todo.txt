@@ -2,28 +2,21 @@
 
 FRONTEND
 
- DESIGN
- * Mooi twitterish dingetje CSS
+ * Design voor frontpage
 
  OPHALEN ARTIESTEN
- * Meer user informatie
+ * [DONE] Meer user informatie
 	* Profielfotootje
-	* Geboortedatum
-	* Geslacht
 	
-Bullshit-header, zoiets als
-SUBJECT ID  DEHOL 861124 M
-
-
- * Last fm
- * Facebook
+ * [DONE] Last fm
+ * [DONE] Facebook
  * Manual
 
 VISUALISATIE BACKEND
   * Mooie layout voor PCR-grafiekjes
  
 PRINTER BACKEND
-  * Process maken dat alles doet
+  * [DONE] Process maken dat alles doet
 
 POSTER
  * Dump data
