@@ -256,6 +256,8 @@ class Visualizer(object):
             individual artists are rows, their projected
             features are the columns
         """
+        self.printcall('hw','INIT')
+        
         for i in xrange(min(3, projection.shape[1])):
             bar = self.drawbar(projection[:,i])
             imsave('temp.png', bar)
@@ -263,11 +265,15 @@ class Visualizer(object):
             self.printcall('image','temp.png')
             self.printcall('control','LF')
         
+        username = username.upper().replace(' ','')
         gibber = "MUSIC_DNA//USR:%s" % (username.upper())
-        
-        self.printcall('text',gibber)
+
         self.printcall('set', align='right')
         self.printcall('control','LF')
+        self.printcall('text',gibber)
+        self.printcall('control', 'LF')
+        self.printcall('set', align='left')
+
         self.printcall('image','256-noise-clean.gif')
         self.printcall('cut')
         

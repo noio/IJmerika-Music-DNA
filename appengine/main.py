@@ -30,7 +30,7 @@ class GetArtistsForUsersHandler(webapp2.RequestHandler):
         afus = ArtistsForUser.all().order('-created_at').fetch(10)
         afus_dict = []
         for afu in afus:
-            name = afu.full_name if afu.full_name else afu.lastfm_user if afu.lastfm_user else "unknown"
+            name = afu.full_name if afu.full_name else (afu.lastfm_user if afu.lastfm_user else "unknown")
             afus_dict.append({'name': name,
                          'artists': afu.artists,
                          'fb_user': afu.fb_user,
@@ -54,7 +54,7 @@ class StoreArtistsForUserHandler(webapp2.RequestHandler):
 
             logging.info(artists)
 
-            # Store the fukekr
+            # Store the object
             afu_obj = ArtistsForUser(fb_user=fb_user, 
                                      lastfm_user=lastfm_user,
                                      artists=artists, 

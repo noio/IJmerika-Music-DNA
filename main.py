@@ -41,10 +41,10 @@ if __name__ == '__main__':
     # BUILD ONE OTHERWISE
     except IOError:
         print "Building new Artist Matrix."
-        feature_artists = set([artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag, 50)])
+        feature_artists = set([artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag, 100)])
 
         # PCA:
-        sample_artists = lastfm.chart_gettopartists(100)
+        sample_artists = lastfm.chart_gettopartists(500)
         am.set_projection_pca(feature_artists, sample_artists)
         am.find_distribution(sample_artists)
         
@@ -60,19 +60,24 @@ if __name__ == '__main__':
         epson = None
         print "Printer error: " + str(e)
     viz = Visualizer(epson, dry_run=False)
+    starttime = datetime.now()
+    done = set()
     
     while True:
-        done = set()
-        now = datetime.now()
-
         # CHECK FOR NEW USER DATA ONLINE
-        data = json.loads(urllib2.urlopen(SERVER_URL).read())
+        response = urllib2.urlopen(SERVER_URL).read()
+        print "Polled %d kb of data." % (len(response))
+        data = json.loads(response)
         for entry in data:
             date = datetime.strptime(entry['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
-            if (entry['key'] not in done and 
-                (now - date) < timedelta(hours=10)):
+            # Ugly timezone hack
+            date += timedelta(hours=1)
+            print "Last at %s" % (date)
+            if (entry['key'] not in done and date > starttime):
                 # CLEAN DATA
+                done.add(entry['key'])
                 artists = entry['artists']
+                print "Found new with %d artists." % (len(artists))
                 if len(artists) > 3:
                     # PROJECT ARTISTS ONTO FEATURES
                     projected, valid = am.project(artists)
@@ -81,7 +86,7 @@ if __name__ == '__main__':
                     viz.printout(data, entry['name'])
         
                     # CALL PRINTER
-                    done.add(entry['key'])
+
                 else:
                     print "Too few artists for user '%s'" % entry['name']
         time.sleep(10);
