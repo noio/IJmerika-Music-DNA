@@ -70,6 +70,7 @@ class LastFM(object):
             print "LastFM: %s %s" % (method, params)
             data = json.loads(urllib2.urlopen(url).read())
             
+            
             if 'error' in data:
                 return []
             
@@ -93,9 +94,6 @@ class LastFM(object):
     def artist_getsimilar(self, artist):
         if artist == "[unknown]":
             return []
-            
-        data = self.get('artist.getsimilar', {'artist': artist.encode('utf-8')})
-        # print data
         
         extractor = lambda data: [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
         return self.get('artist.getsimilar', {'artist': artist.encode('utf-8')}, extractor)
@@ -190,7 +188,7 @@ class ArtistMatrix(object):
         else:
             self.coefficients = np.vstack((self.coefficients, w))
         
-    def project(self, artists, normalize_projection=False, normalization_method='uniformize'):
+    def project(self, artists, normalize_projection=True, normalization_method='uniformize'):
         # Gather data
         data = np.vstack([self.get_vector(artist) for artist in artists])
         data -= self.center                          # Subtract center
