@@ -31,18 +31,23 @@ if __name__ == '__main__':
         print "Building new Artist Matrix."
         feature_artists = set([artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag, 50)])
         
+        # PCA
+        sample_artists = lastfm.chart_gettopartists(100)
+        print sample_artists
+        am.set_projection_pca(feature_artists, sample_artists)
+        
         # LDA:
-        am.set_projection_lda(feature_artists,
-                              lastfm.tag_gettopartists("indie", 20), 
-                              lastfm.tag_gettopartists("pop", 20))
-
-        am.set_projection_lda(feature_artists,
-                              lastfm.tag_gettopartists("electronic", 20), 
-                              lastfm.tag_gettopartists("metal", 20))
-                              
-        am.set_projection_lda(feature_artists,
-                              lastfm.tag_gettopartists("hip hop", 20), 
-                              lastfm.tag_gettopartists("indie", 20))
+        # am.set_projection_lda(feature_artists,
+        #                       lastfm.tag_gettopartists("indie", 20), 
+        #                       lastfm.tag_gettopartists("pop", 20))
+        # 
+        # am.set_projection_lda(feature_artists,
+        #                       lastfm.tag_gettopartists("electronic", 20), 
+        #                       lastfm.tag_gettopartists("metal", 20))
+        #                       
+        # am.set_projection_lda(feature_artists,
+        #                       lastfm.tag_gettopartists("hip hop", 20), 
+        #                       lastfm.tag_gettopartists("indie", 20))
     
         
         am.dump('_artistmatrix_test.pickle.gz')

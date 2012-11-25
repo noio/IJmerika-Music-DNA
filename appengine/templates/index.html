@@ -29,6 +29,7 @@
             
             // Hier starten we met zoeken
             get_liked_artists(r);
+            get_friends_liked_artists(r);
 
           });
         }
@@ -48,6 +49,18 @@
           }
         });
 
+      }
+      
+      function get_friends_liked_artists(data){
+          request_url = 'https://graph.facebook.com/'+user_id+"/friends?access_token="+access_token;
+
+          $.getJSON(request_url, function(data, status){
+            if(status=="success"){
+              console.log('data');
+            }else{
+              console.log("The request for user's likes went bad: "+status)
+            }
+          });
       }
 
       function process_artists(data){

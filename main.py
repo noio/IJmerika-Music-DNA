@@ -38,7 +38,7 @@ if __name__ == '__main__':
         # PCA:
         sample_artists = lastfm.chart_gettopartists(100)
         am.set_projection_pca(feature_artists, sample_artists)
-                
+        
         am.dump('_artistmatrix.pickle.gz')
     
     am.print_info()

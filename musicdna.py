@@ -73,8 +73,7 @@ class LastFM(object):
                 data = extractor(data)
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
-            if len(self.cache) % 20 == 0:
-                self.dump_cache()
+            self.dump_cache()
         return self.cache[(method, frozenset(params.items()))]
         
     def dump_cache(self):
@@ -93,7 +92,7 @@ class LastFM(object):
         
     def chart_gettopartists(self, limit=200):
         extractor = lambda data: [d['name'] for d in data['artists']['artist']]
-        data = self.get('chart.gettopartists', {'limit': limit}, extractor)
+        return self.get('chart.gettopartists', {'limit': limit}, extractor)
         
     def user_gettopartists(self, user, limit=50):
         extractor = lambda data: [d['name'] for d in data['topartists']['artist']]
