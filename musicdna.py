@@ -94,7 +94,7 @@ class LastFM(object):
     def artist_getsimilar(self, artist):
         if artist == "[unknown]":
             return []
-        
+
         extractor = lambda data: [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
         return self.get('artist.getsimilar', {'artist': artist.encode('utf-8')}, extractor)
         
@@ -122,8 +122,7 @@ class ArtistMatrix(object):
                                     # "features". The "columns" of the matrix
         self.coefficients    = None # The feature vector coefficients resulting from PCA
         self.center          = None # The data center (mean)
-        self.projected_sample_distributions = None # Distributions that resemble resulting projections for large population
-        self.sample_artists = []
+        self.distributions = [] # Distributions that resemble resulting projections for large population
         
     def load(self, filename):
         """ Load this object's data from the given file. """
@@ -132,12 +131,15 @@ class ArtistMatrix(object):
         self.feature_artists = fields['feature_artists']
         self.coefficients    = fields['coefficients']
         self.center          = fields['center']
+        self.distributions   = fields['distributions']
         
     def dump(self, filename):
         """ Dumps this object's data to the given file. """
         fields = {'feature_artists': self.feature_artists,
                   'coefficients': self.coefficients,
-                  'center': self.center}
+                  'center': self.center,
+                  'distributions': self.distributions,
+                  }
         pickle.dump(fields, gzip.open(filename, 'wb'))
                 
     def get_vector(self, artist):
@@ -151,7 +153,6 @@ class ArtistMatrix(object):
         """ Performs PCA on the feature_artists/sample_artist matrix
         """
         self.feature_artists = feature_artists
-        self.sample_artists += sample_artists
         # Build a data matrix, observations are rows
         matrix = np.vstack([self.get_vector(artist) for artist in sample_artists])
         # Subtract the mean
@@ -168,7 +169,6 @@ class ArtistMatrix(object):
         """ Performs linear disciminant analysis:
         """
         self.feature_artists = feature_artists
-        self.sample_artists += sample0 + sample1
         # Build a data matrix, observations are rows
         matrix0 = np.vstack([self.get_vector(artist) for artist in sample0])
         matrix1 = np.vstack([self.get_vector(artist) for artist in sample1])
@@ -194,24 +194,25 @@ class ArtistMatrix(object):
         data -= self.center                          # Subtract center
         data = normalize(data)
         
-        if normalize_projection:
+        return np.dot(self.coefficients, data.T).T
             
-            if self.projected_sample_distributions == None:
-                self.estimate_projected_distribution()
+    def find_distribution(self, sample):
+        """ Find the data distributions for the given sample """
+        data = self.project(sample)
+        self.distributions = [scipy.stats.norm.fit(dim) for dim in data.T]
+        
             
-            result = np.dot(self.coefficients, data.T).T
-                        
-            for col in xrange(result.shape[1]):
-                if normalization_method == 'uniformize':
-                    dist = scipy.stats.norm(self.projected_sample_distributions[col][0], self.projected_sample_distributions[col][1])
-                    result[:, col] = dist.cdf(result[:, col])
-                elif normalization_method == 'zscore':
-                    result[:, col] = (result[:, col] - self.projected_sample_distributions[col][0]) / self.projected_sample_distributions[col][1]
+    def redistribute(self, projection, method='uniform'):
+        """ Redistribute the projected coefficients
+        """
+        for i, (col, dist) in enumerate(zip(projection.T, self.distributions)):
+            if method == 'uniform':
+                dist = scipy.stats.norm(*dist)
+                projection[:, i] = dist.cdf(col)
+            else:
+                projection[:, i] = (col - dist[0]) / dist[1]
+        return projection
             
-            return result
-            
-        else:
-            return np.dot(self.coefficients, data.T).T
         
     def print_info(self):
         """ Print some information about the projection this matrix
@@ -239,33 +240,37 @@ class Visualizer(object):
         projected artists.
     """
     
-    def __init__(self, resolution=(150, 400), bars=3, bar_height=20, bar_range=None):
+
+    def __init__(self, printer, resolution=512, 
+                                bars=3, 
+                                bar_height=20, 
+                                bar_range=None):
         # Vars
-        self.res            = resolution
-        self.bars           = bars
-        # TODO: Set proper range for bars, this is just empirically found.
+        self.printer    = printer
+        self.resolution = resolution
+        self.bars       = bars
+        self.bar_range  = bar_range
+        self.bar_height = bar_height
         
-        if bar_range == None:
-            self.bar_data_range = [(-0.1, 0.1) for _ in xrange(bars)]
+        if self.bar_range == None:
+            self.bar_range = [(0, 1) for _ in xrange(bars)]
         
-        else:
-            self.bar_data_range = bar_range
         
-        self.bar_height     = bar_height
-        
-    def draw(self, projection, filename):
+    def printout(self, projection, username):
         """ Projection is an n x p matrix, 
             individual artists are rows, their projected
             features are the columns
         """
-        bars = np.vstack([self.drawbar(projection[:,i]) for i in xrange(3)])
-        imsave(filename, bars)
+        for i in xrange(min(3, projection.shape[1])):
+            bar = [self.drawbar(projection[:,i]) for i in xrange(3)]
+            imsave('temp.png', bar)
+            self.printer.image('temp.png')
         
     def drawbar(self, projection):
         """ Return image of a single electrophoresis bar """
-        w = self.res[0]
-        bar = np.ones((30, w))
-        x = remap(projection, self.bar_data_range[0], (0, w))
+        w = self.resolution
+        bar = np.ones((self.bar_height, w))
+        x = remap(projection, self.bar_range[0], (0, w))
         x = np.clip(x, 2, w-2).astype('int')
         for _x in x:
             bar[:, _x-2:_x+1] *= 0.8

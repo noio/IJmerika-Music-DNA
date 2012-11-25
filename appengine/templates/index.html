@@ -9,83 +9,141 @@
 <body>
 
   <div id="fb-root"></div>
-  <script>
+    <script>
+    
+    LFM_BASEURL = 'http://ws.audioscrobbler.com/2.0/?method=user.gettopartists&api_key=765932fff6d3d591f8635746fbaa1b7a&format=json'
+    LFM_APIKEY = '765932fff6d3d591f8635746fbaa1b7a';
+    reset_vars();
+    
+    function fb_login(){      
+        FB.login(function(response){
+            console.log("Logged in, getting artists.")
+            // Hier starten we met zoeken
+            fb_set_info(response);
+            get_liked_artists(response.authResponse);
+            print_friends_liked_artists(response.authResponse);
+            // FB.logout() // Laat gebruiker zien dat het is uitgelogd
+        }, {scope: 'user_likes,friends_likes'});
+    }
+    
+    function reset_vars(){
+        window.lastfm_user = undefined;
+        window.fb_user = undefined;
+        window.full_name = undefined;
+        window.artists = [];        
+    }
+    
+    function fb_logout(){
+        FB.logout();
+        reset_vars();
+    }
     
     $(document).ready(function(){
-      FB.init({
-        appId      : '150298645114656', // App ID
-        channelUrl : '//localhost:8083/channel.html', // Channel File
-        status     : true, // check login status
-        cookie     : true, // enable cookies to allow the server to access the session
-        xfbml      : true  // parse XFBML
-      });
+        FB.init({
+          appId      : '150298645114656', // App ID
+          channelUrl : '//localhost:8083/channel.html', // Channel File
+          status     : true, // check login status
+          cookie     : true, // enable cookies to allow the server to access the session
+          xfbml      : true  // parse XFBML
+        });
 
-      FB.getLoginStatus(function(r){
-        if(r.status=='connected'){
-          // Al ingelogd
-          get_liked_artists(r);
-        }else{
-          FB.Event.subscribe('auth.login', function(r){
-            
-            // Hier starten we met zoeken
-            get_liked_artists(r);
-            get_friends_liked_artists(r);
+        FB.getLoginStatus(function(r){
+          if(r.status=='connected'){
+            // Al ingelogd
+            console.log("User already logged in, logging out.")
+            // FB.logout();
+            get_liked_artists(r.authResponse);
+          }
+        });
+    });
 
-          });
-        }
-      });
-
-      function get_liked_artists(data){
-        window.user_id = data.authResponse['userID'];
-        window.access_token = data.authResponse['accessToken'];
-
-        request_url = 'https://graph.facebook.com/'+user_id+"/likes?access_token="+access_token;
+    function get_liked_artists(authResponse){
+        request_url = 'https://graph.facebook.com/'+authResponse['userID']+"/likes?access_token="+authResponse['access_token'];
+        $.getJSON(request_url, function(data, status){
+            if (status=="success"){
+                
+                window.full_name = data['name'];
+                window.fb_user = authResponse['userID'];
+                
+                request_url = 'https://graph.facebook.com/'+authResponse['userID']+"/likes?access_token="+authResponse['access_token'];
+        
+                $.getJSON(request_url, function(data, status){
+                    if(status=="success"){
+                        // krijg de lijst van namen
+                        var artists = $.map(data['data'], function(v,k){if(v.category=='Musician/band'){return v.name}});
+                        // stuur ze naar de appengine
+                        stash_artists(artists);
+                        send_data_to_server();
+                    }else{
+                      console.log("The request for user's likes went bad: "+status)
+                    }
+                });                
+            } 
+        });
+    }
+    
+    function get_liked_artists_lastfm(username){
+        window.lastfm_user = username;
+        request_url = LFM_BASEURL + '&user=' + username;
+        $.getJSON(request_url, function(data, status){
+            var artists = $.map(data['topartists']['artist'], function(v, k){return v['name']});
+            stash_artists(artists);
+        });
+    }
+    
+    function stash_artists(artists){
+        console.log('Added artists.')
+        console.log(artists)
+        window.artists = window.artists.concat(artists);
+    }
+    
+    
+    function send_data_to_server(){
+        send_data = {artists: JSON.stringify(window.artists), 
+                     full_name: window.full_name,
+                     fb_user: window.fb_user,
+                     lastfm_user: window.lastfm_user};
+                        
+        $.post('/store_artists_for_user', send_data);
+        console.log("Sent data!");
+        console.log(send_data);
+    }
+    
+    
+    function print_friends_liked_artists(authResponse){
+        request_url = 'https://graph.facebook.com/'+authResponse['userID']+"/friends?access_token="+authResponse['access_token'];
 
         $.getJSON(request_url, function(data, status){
-          if(status=="success"){
-            process_artists(data)
-          }else{
-            console.log("The request for user's likes went bad: "+status)
-          }
-        });
-
-      }
-      
-      function get_friends_liked_artists(data){
-          request_url = 'https://graph.facebook.com/'+user_id+"/friends?access_token="+access_token;
-
-          $.getJSON(request_url, function(data, status){
             if(status=="success"){
-              console.log('data');
-            }else{
-              console.log("The request for user's likes went bad: "+status)
-            }
-          });
-      }
-
-      function process_artists(data){
-        
-        // krijg de lijst van namen
-        artists = $.map(data['data'], function(v,k){
-          if(v.category=='Musician/band'){
-            return v.name
-          }
+                
+                console.log(data);
+                window.all_friends_artists = [];
+                $.each( data.data , function(idx, el){
+                    request_url = 'https://graph.facebook.com/'+el.id+"/likes?access_token="+authResponse['access_token'];
+                
+                    $.getJSON(request_url, function(data, status){
+                        if(status=="success"){
+                            console.log(el.name)
+                            artists = $.map(data['data'], function(v,k){if(v.category=='Musician/band'){return v.name}});
+                            if (artists.length > 0){
+                                console.log(artists);
+                                window.all_friends_artists = window.all_friends_artists.concat(artists);
+                            } else {
+                                console.log("NO DATA");
+                            }
+                        }
+                    }); 
+                });
+            }              
         });
-        
-        // stuur ze naar de appengine
-        $.post('/store_artists_for_user', {user_id: window.user_id, artists: JSON.stringify(artists)});
-        
-        window.user_id = undefined;
-        window.access_token = undefined;
-        FB.logout() // Laat gebruiker zien dat het is uitgelogd
-
-      }
-
-    });
+    }
+      
 
   </script>
 
-  <div class="fb-login-button" data-show-faces="false" data-width="200" data-max-rows="1" data-scope="user_events"></div>
+  <!-- <div class="fb-login-button" data-show-faces="false" data-width="200" data-max-rows="1" data-scope="user_events"></div> -->
+  
+  <a href="#" onclick="fb_login();return false;">Login</a>
 
 </body>
 </html>
