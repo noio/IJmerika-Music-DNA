@@ -194,7 +194,7 @@ class Visualizer(object):
         projected artists.
     """
     
-    def __init__(self, resolution=(150, 400), bars=3, bar_height=20):
+    def __init__(self, resolution=(150, 512), bars=3, bar_height=20):
         # Vars
         self.res            = resolution
         self.bars           = bars
