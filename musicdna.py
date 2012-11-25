@@ -95,7 +95,7 @@ class LastFM(object):
             return []
             
         data = self.get('artist.getsimilar', {'artist': artist.encode('utf-8')})
-        print data
+        # print data
         
         extractor = lambda data: [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
         return self.get('artist.getsimilar', {'artist': artist.encode('utf-8')}, extractor)
