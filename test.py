@@ -1,10 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 
-""" Main script for music-dna.
-    Checks the website for new artist data,
-    processes them (by projecting on the coeffiecients),
-    saves an output image, and calls the printing function
+""" Test script for music-dna.
 """
 
 ### IMPORTS ###
@@ -13,7 +10,6 @@
 
 # Local
 from musicdna import *
-        
         
 ### SETTINGS ###
 
@@ -28,33 +24,36 @@ if __name__ == '__main__':
 
     # CHECK IF THERE IS A COEFFICIENT MATRIX AVAILABLE
     try:
-        am.load('_artistmatrix.pickle.gz')
+        am.load('_artistmatrix_test.pickle.gz')
         print "Found Artist Matrix data."
     # BUILD ONE OTHERWISE
     except IOError:
         print "Building new Artist Matrix."
         feature_artists = set([artist for tag in LASTFM_FRONTPAGE_TAGS for artist in lastfm.tag_gettopartists(tag, 50)])
+        
+        # LDA:
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("indie", 20), 
+                              lastfm.tag_gettopartists("pop", 20))
 
-        # PCA:
-        sample_artists = lastfm.chart_gettopartists(100)
-        am.set_projection_pca(feature_artists, sample_artists)
-                
-        am.dump('_artistmatrix.pickle.gz')
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("electronic", 20), 
+                              lastfm.tag_gettopartists("metal", 20))
+                              
+        am.set_projection_lda(feature_artists,
+                              lastfm.tag_gettopartists("hip hop", 20), 
+                              lastfm.tag_gettopartists("indie", 20))
+    
+        
+        am.dump('_artistmatrix_test.pickle.gz')
     
     am.print_info()
     
     viz = Visualizer()
+        
+    # TEST
+    for user in ['andr01d', 'jeboyG', 'tomaiz']:
+        artists = lastfm.user_gettopartists(user, limit=20)
+        viz.draw(am.project(artists), 'bar_' + user + '.png')
+
     
-    # TODO: Below
-    # while True:
-        # CHECK FOR NEW USER DATA ONLINE
-        
-        # CLEAN DATA
-        
-        # PROJECT ARTISTS ONTO FEATURES
-        
-        # SAVE AN IMAGE
-        
-        # CALL PRINTER
-        # time.sleep(10);
-        
