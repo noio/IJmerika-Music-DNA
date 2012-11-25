@@ -1,0 +1,54 @@
+
+
+FRONTEND
+
+ DESIGN
+ * Mooi twitterish dingetje CSS
+
+ OPHALEN ARTIESTEN
+ * Meer user informatie
+	* Profielfotootje
+	* Geboortedatum
+	* Geslacht
+	
+Bullshit-header, zoiets als
+SUBJECT ID  DEHOL 861124 M
+
+
+ * Last fm
+ * Facebook
+ * Manual
+
+VISUALISATIE BACKEND
+  * Mooie layout voor PCR-grafiekjes
+ 
+PRINTER BACKEND
+  * Process maken dat alles doet
+
+POSTER
+ * Dump data
+ * Design
+
+
+DATA
+
+ * Beste Projectiemethode
+ * Beste fature/sample artists
+
+PRINTER
+
+VRAGEN DATA
+ * LDA/PCA
+ * 
+
+
+TO DO
+Thomas
+ * 
+
+
+Gilles
+ * LDA
+ 	* paar verschillende assen
+ * PCA
+ * top 100/1000 + aantal toppen met groot aantal tags
