@@ -24,7 +24,8 @@ from scipy.misc import imsave
 from scipy.ndimage.interpolation import zoom
 import matplotlib.pyplot as plt
 
-
+import scipy
+from scipy import stats
 
 # Shortcuts & library settings
 np.seterr(all='raise')
@@ -68,12 +69,19 @@ class LastFM(object):
             url = '%s?method=%s&%s&api_key=%s&format=json' % (LastFM.API_URL, method, querystring, self.api_key)
             print "LastFM: %s %s" % (method, params)
             data = json.loads(urllib2.urlopen(url).read())
+            
+            if 'error' in data:
+                return []
+            
             # Extract only the desired data, saves cache size/time
             if callable(extractor):
                 data = extractor(data)
+
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
-            self.dump_cache()
+
+            if len(self.cache) % 20 == 0:
+                self.dump_cache()
         return self.cache[(method, frozenset(params.items()))]
         
     def dump_cache(self):
@@ -83,6 +91,12 @@ class LastFM(object):
             pickle.dump(self.cache, gz, protocol=-1)
         
     def artist_getsimilar(self, artist):
+        if artist == "[unknown]":
+            return []
+            
+        data = self.get('artist.getsimilar', {'artist': artist.encode('utf-8')})
+        print data
+        
         extractor = lambda data: [(d['name'],float(d['match'])) for d in data['similarartists']['artist']]
         return self.get('artist.getsimilar', {'artist': artist.encode('utf-8')}, extractor)
         
@@ -94,7 +108,7 @@ class LastFM(object):
         extractor = lambda data: [d['name'] for d in data['artists']['artist']]
         return self.get('chart.gettopartists', {'limit': limit}, extractor)
         
-    def user_gettopartists(self, user, limit=50):
+    def user_gettopartists(self, user, limit=50, period='12month'):
         extractor = lambda data: [d['name'] for d in data['topartists']['artist']]
         return self.get('user.gettopartists', {'user': user, 'limit': limit}, extractor)
         
@@ -110,6 +124,8 @@ class ArtistMatrix(object):
                                     # "features". The "columns" of the matrix
         self.coefficients    = None # The feature vector coefficients resulting from PCA
         self.center          = None # The data center (mean)
+        self.projected_sample_distributions = None # Distributions that resemble resulting projections for large population
+        self.sample_artists = []
         
     def load(self, filename):
         """ Load this object's data from the given file. """
@@ -137,6 +153,7 @@ class ArtistMatrix(object):
         """ Performs PCA on the feature_artists/sample_artist matrix
         """
         self.feature_artists = feature_artists
+        self.sample_artists += sample_artists
         # Build a data matrix, observations are rows
         matrix = np.vstack([self.get_vector(artist) for artist in sample_artists])
         # Subtract the mean
@@ -147,10 +164,13 @@ class ArtistMatrix(object):
         self.coefficients = v.T[:max_comps]
         print "ArtistMatrix: obtained %s coefficient matrix." % (self.coefficients.shape, )
         
+
+        
     def set_projection_lda(self, feature_artists, sample0, sample1, add=True):
         """ Performs linear disciminant analysis:
         """
         self.feature_artists = feature_artists
+        self.sample_artists += sample0 + sample1
         # Build a data matrix, observations are rows
         matrix0 = np.vstack([self.get_vector(artist) for artist in sample0])
         matrix1 = np.vstack([self.get_vector(artist) for artist in sample1])
@@ -170,12 +190,30 @@ class ArtistMatrix(object):
         else:
             self.coefficients = np.vstack((self.coefficients, w))
         
-    def project(self, artists):
+    def project(self, artists, normalize_projection=False, normalization_method='uniformize'):
         # Gather data
         data = np.vstack([self.get_vector(artist) for artist in artists])
         data -= self.center                          # Subtract center
         data = normalize(data)
-        return np.dot(self.coefficients, data.T).T
+        
+        if normalize_projection:
+            
+            if self.projected_sample_distributions == None:
+                self.estimate_projected_distribution()
+            
+            result = np.dot(self.coefficients, data.T).T
+                        
+            for col in xrange(result.shape[1]):
+                if normalization_method == 'uniformize':
+                    dist = scipy.stats.norm(self.projected_sample_distributions[col][0], self.projected_sample_distributions[col][1])
+                    result[:, col] = dist.cdf(result[:, col])
+                elif normalization_method == 'zscore':
+                    result[:, col] = (result[:, col] - self.projected_sample_distributions[col][0]) / self.projected_sample_distributions[col][1]
+            
+            return result
+            
+        else:
+            return np.dot(self.coefficients, data.T).T
         
     def print_info(self):
         """ Print some information about the projection this matrix
@@ -184,9 +222,18 @@ class ArtistMatrix(object):
         for i in range(min(3, len(self.coefficients))):
             print "=== Dimension %d ===" % i
             assert len(self.coefficients[i,:]) == len(self.feature_artists)
-            influence = sorted(zip(self.coefficients[i,:], self.feature_artists), reverse=True)
+            influence = sorted(zip(self.project(self.feature_artists)[:, i], self.feature_artists), reverse=True)
             print '    More like: ' + ', '.join(artist for (_, artist) in influence[:5])
             print '    Less like: ' + ', '.join(artist for (_, artist) in influence[-5:])
+            
+    def estimate_projected_distribution(self):
+        
+        self.projected_sample_distributions = []
+        
+        data = self.project(self.sample_artists)
+        
+        for i in xrange(len(self.coefficients)):
+            self.projected_sample_distributions.insert(i, scipy.stats.norm.fit(data[:, i]))
 
  
 class Visualizer(object):
@@ -194,12 +241,19 @@ class Visualizer(object):
         projected artists.
     """
     
-    def __init__(self, resolution=(150, 512), bars=3, bar_height=20):
+
+    def __init__(self, resolution=(150, 400), bars=3, bar_height=20, bar_range=None):
         # Vars
         self.res            = resolution
         self.bars           = bars
         # TODO: Set proper range for bars, this is just empirically found.
-        self.bar_data_range = [(-0.1, 0.1) for _ in xrange(bars)]
+        
+        if bar_range == None:
+            self.bar_data_range = [(-0.1, 0.1) for _ in xrange(bars)]
+        
+        else:
+            self.bar_data_range = bar_range
+        
         self.bar_height     = bar_height
         
     def draw(self, projection, filename):
