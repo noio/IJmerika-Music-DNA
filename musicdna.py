@@ -74,7 +74,8 @@ class LastFM(object):
                 # Extract only the desired data, saves cache size/time
                 if callable(extractor):
                     data = extractor(data)
-            except (TypeError, KeyError):
+            except (TypeError, KeyError) as e:
+                print 'LastFM: API ERROR: ' + str(e)
                 data = []
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
@@ -217,14 +218,17 @@ class ArtistMatrix(object):
         """ Print some information about the projection this matrix
             performs
         """
+        print "ArtistMatrix: has %dx%d coefficient matrix." % self.coefficients.shape
         for i in range(min(3, len(self.coefficients))):
             print "=== Dimension %d ===" % i
             assert len(self.coefficients[i,:]) == len(self.feature_artists)
-            projected, _ = self.project(self.feature_artists)[:, i]
-            influence = sorted(zip(project, self.feature_artists), reverse=True)
+            projected, _ = self.project(self.feature_artists)
+            projected = projected[:,i]
+            influence = sorted(zip(projected, self.feature_artists), reverse=True)
             print '    More like: ' + ', '.join(artist for (_, artist) in influence[:5])
             print '    Less like: ' + ', '.join(artist for (_, artist) in influence[-5:])
-            
+        self.lastfm.dump_cache()
+        
 
  
 class Visualizer(object):

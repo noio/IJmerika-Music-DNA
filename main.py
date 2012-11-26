@@ -38,6 +38,7 @@ if __name__ == '__main__':
     try:
         am.load('_artistmatrix.pickle.gz')
         print "Found Artist Matrix data."
+        am.print_info()
     # BUILD ONE OTHERWISE
     except IOError:
         print "Building new Artist Matrix."
@@ -68,7 +69,7 @@ if __name__ == '__main__':
         response = urllib2.urlopen(SERVER_URL).read()
         print "Polled %d kb of data." % (len(response))
         data = json.loads(response)
-        for entry in data:
+        for entry in data[::-1]:
             date = datetime.strptime(entry['created_at'], '%Y-%m-%dT%H:%M:%S.%f')
             # Ugly timezone hack
             date += timedelta(hours=1)

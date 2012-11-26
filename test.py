@@ -51,7 +51,7 @@ def build_poster(sample_artists, am, filename, target_length=75):
     # sample_scores sample_scores[
     
     for artist, score in zip(sample_artists, sample_scores):
-        for i in range(3):
+        # for i in range(3):
             text1 = et.Element('text', x='300', y=str(100 + score[0] * 1000), fill='black', style='font-family:Sans;font-size:20px;text-anchor:middle;dominant-baseline:top')
             text2 = et.Element('text', x='800', y=str(100 + score[1] * 1000), fill='black', style='font-family:Sans;font-size:20px;text-anchor:middle;dominant-baseline:top')
             text3 = et.Element('text', x='1300', y=str(100 + score[2] * 1000), fill='black', style='font-family:Sans;font-size:20px;text-anchor:middle;dominant-baseline:top')
@@ -142,7 +142,7 @@ if __name__ == '__main__':
             fn = 'sample_%s_%s_%d_feats_tag.svg' % (projection_method['method'], projection_method['sample_method'], N_FEATS_PER_TAG)
         
         
-        build_poster(sample_artists, am, os.path.join('posters', fn), target_length=None)
+        build_poster(sample_artists, am, os.path.join('posters', fn), target_length=75)
         
 
         pkl.dump(am, open('artist_matrices/%s.pkl' % ''.join(fn.split('.')[:-1]), 'w'))
