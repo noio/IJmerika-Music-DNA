@@ -75,7 +75,7 @@ class LastFM(object):
                 if callable(extractor):
                     data = extractor(data)
             except (TypeError, KeyError):
-                return []
+                data = []
             self.cache[(method, frozenset(params.items()))] = data
             # Store the cache every 20 items.
 
