@@ -2,7 +2,7 @@
 
 FRONTEND
 
- * Design voor frontpage
+ * [DONE] Design voor frontpage
 
  OPHALEN ARTIESTEN
  * [DONE] Meer user informatie
@@ -10,34 +10,30 @@ FRONTEND
 	
  * [DONE] Last fm
  * [DONE] Facebook
- * Manual
+ * [DONE] Manual
 
 VISUALISATIE BACKEND
-  * Mooie layout voor PCR-grafiekjes
+  * [DONE] Mooie layout voor PCR-grafiekjes
  
 PRINTER BACKEND
   * [DONE] Process maken dat alles doet
 
 POSTER
- * Dump data
+ * [DONE] Dump data
  * Design
 
 
 DATA
 
- * Beste Projectiemethode
- * Beste fature/sample artists
+ * [DONE] Beste Projectiemethode: PCA
+ * [DONE] Beste fature/sample artists: Top 500
 
 PRINTER
 
 VRAGEN DATA
  * LDA/PCA
- * 
 
 
-TO DO
-Thomas
- * 
 
 
 Gilles
